@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>ศูนย์รวมกระดานหุ้น</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet">
+<!--
+  ศูนย์รวมกระดานหุ้น (หน้าแรกของ Pages : hub.html)
+  ไม่มีข้อมูลส่วนตัวในไฟล์นี้ (พอร์ต/DR แสดงแค่ชื่อ + "เปิดได้เฉพาะคอมเครื่องนี้")
+  ไฟล์นี้อยู่ที่ web/site/hub.html ; web/publish_board.sh ยกไปไว้ root ของ Pages พร้อม nav.js ทุกครั้งที่เผยแพร่
+
+  ไม่มีค่าข้อมูลฝังในไฟล์ : ทุกค่ามาจากไฟล์ meta ที่อยู่ข้างหน้านี้บน Pages (same-origin, cache: 'no-store')
+    - US   : meta.json      -> {data_through, built_at_utc}
+    - SET  : meta_set.json  -> {data_through, built_at_utc}
+      ระหว่างรอแสดง "กำลังตรวจ…" ; ดึงไม่ได้หรือเกิน 8 วินาทีแสดง "ตรวจไม่ได้" (ปุ่มเปิดกระดานใช้ได้เสมอ)
+    - งบ    : Worker earnings-board ไม่ส่ง CORS header -> หน้านี้อ่านข้ามโดเมนไม่ได้ จึงไม่ดึง แสดง "ดูวันที่ในกระดาน"
+              (ถ้าอยากให้แสดงวันที่ : เปิด CORS ที่ worker/src/index.mjs หรือให้ workflow เขียน meta_earn.json)
+    - วอลุ่ม: อยู่ repo แยก volume-board (มีแค่ index.html ไม่มี meta) -> แสดง "ดูวันที่ในกระดาน"
+              (ถ้าอยากให้แสดงวันที่ : ให้ update_all.cmd เขียน meta_vol.json ลง volume-board แล้วอ่านแบบเดียวกับ US/SET)
+-->
+<style>
+:root {
+  color-scheme: light;
+  --bg: #f5f5f2; --surface: #ffffff; --surface-2: #f0f0ec;
+  --ink: #12120f; --ink-2: #4f4e49; --muted: #6f6d66;
+  --line: #e4e3dc; --line-2: #cfcdc4;
+  --shadow: 0 1px 2px rgba(20,20,10,.04), 0 6px 20px rgba(20,20,10,.05);
+  --imp: #2a78d6;
+  --ok-bg: #e5f4ec;   --ok-ink: #0b6633;
+  --warn-bg: #fdf0d3; --warn-ink: #7d5200;
+  --bad-bg: #fae8e7;  --bad-ink: #9b2a25;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --bg: #0e0e0d; --surface: #1a1a18; --surface-2: #242421;
+    --ink: #f3f3ef; --ink-2: #c3c2b8; --muted: #9c9a90;
+    --line: #2d2d2a; --line-2: #43433e;
+    --shadow: 0 1px 2px rgba(0,0,0,.4);
+    --imp: #4a90e8;
+    --ok-bg: rgba(54,194,115,.15);   --ok-ink: #82e2a8;
+    --warn-bg: rgba(232,174,34,.16); --warn-ink: #f2c964;
+    --bad-bg: rgba(236,106,99,.16);  --bad-ink: #f5a09b;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--ink);
+  font-family: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, system-ui, sans-serif;
+  font-size: 15px; line-height: 1.65; -webkit-font-smoothing: antialiased;
+}
+a { color: inherit; }
+:focus-visible { outline: 2px solid var(--imp); outline-offset: 2px; border-radius: 4px; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 0 16px; }
+
+header.top { padding: 28px 0 8px; }
+header.top h1 { margin: 0; font-size: clamp(26px, 5vw, 36px); line-height: 1.2; letter-spacing: -.01em; font-weight: 700; }
+header.top .sub { margin: 6px 0 0; color: var(--ink-2); max-width: 62ch; }
+.nowline { margin-top: 14px; color: var(--muted); font-size: 13px; }
+
+h2.grp { margin: 30px 0 4px; font-size: 18px; font-weight: 700; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+h2.grp small { font-size: 13px; font-weight: 400; color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr)); gap: 14px; margin-top: 12px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.card.local { background: transparent; border-style: dashed; border-color: var(--line-2); box-shadow: none; }
+.c-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.c-head h3 { margin: 0; font-size: 18px; line-height: 1.35; font-weight: 700; }
+.c-desc { margin: 0; color: var(--ink-2); font-size: 14.5px; }
+.c-meta { margin: 2px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 13px; color: var(--muted); }
+.c-meta dt { white-space: nowrap; }
+.c-meta dd { margin: 0; color: var(--ink-2); min-width: 0; overflow-wrap: anywhere; }
+.c-meta dd b { font-weight: 600; color: var(--ink); }
+.src { display: inline-block; margin-left: 6px; padding: 0 7px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--line); font-size: 11.5px; color: var(--muted); white-space: nowrap; }
+.c-act { margin-top: auto; padding-top: 6px; display: flex; flex-wrap: wrap; gap: 8px; }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line-2); background: var(--surface); border-radius: 10px; padding: 6px 14px; font-size: 14px; font-weight: 500; text-decoration: none; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); font-weight: 600; }
+.btn.primary:hover { opacity: .88; }
+.btn svg { width: 12px; height: 12px; opacity: .75; }
+.note { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+.pill { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 13px; font-weight: 500; line-height: 1.6; white-space: nowrap; flex: none; }
+.pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.pill.ok { background: var(--ok-bg); color: var(--ok-ink); }
+.pill.warn { background: var(--warn-bg); color: var(--warn-ink); }
+.pill.bad { background: var(--bad-bg); color: var(--bad-ink); }
+.pill.neutral { background: var(--surface-2); color: var(--ink-2); border: 1px solid var(--line); }
+.pill.neutral::before { background: var(--muted); }
+.pill.checking::before { animation: pulse 1.2s ease-in-out infinite; }
+@keyframes pulse { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .pill.checking::before { animation: none; } }
+.pill.local { background: var(--surface-2); color: var(--ink-2); border: 1px dashed var(--line-2); }
+.pill.local::before { display: none; }
+.pill.local svg { width: 12px; height: 12px; }
+
+.legend { margin-top: 28px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; color: var(--ink-2); background: var(--surface); }
+.legend p { margin: 4px 0; }
+footer { padding: 24px 0 56px; color: var(--muted); font-size: 12.5px; }
+</style>
+</head>
+<body>
+<script src="nav.js" data-current="hub"></script>
+
+<header class="top">
+  <div class="wrap">
+    <h1>ศูนย์รวมกระดานหุ้น</h1>
+    <p class="sub">จุดเดียวที่ไว้เปิดทุกกระดาน ดูว่าแต่ละกระดานตอบคำถามอะไร ข้อมูลถึงวันไหน และสดหรือค้าง ก่อนกดเข้าไปดู</p>
+    <div class="nowline" id="nowline"></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <h2 class="grp">ออนไลน์ <small>เปิดจากมือถือได้</small></h2>
+  <div class="grid" id="grid-online"></div>
+
+  <h2 class="grp">เฉพาะคอมเครื่องนี้ <small>ต้องเปิดโปรแกรมในเครื่องไว้ก่อน เปิดจากมือถือไม่ได้</small></h2>
+  <div class="grid" id="grid-local"></div>
+
+  <h2 class="grp">อื่น ๆ</h2>
+  <div class="grid" id="grid-other"></div>
+
+  <div class="legend">
+    <p><span class="pill ok">สด</span> ข้อมูลถึงรอบตลาดล่าสุดที่ปิดแล้ว</p>
+    <p><span class="pill warn">ค้าง 1 วัน</span> ช้ากว่าตลาด 1 วันทำการ (อาจเป็นวันหยุดตลาด หรือรอบสร้างยังไม่รัน) &nbsp;
+       <span class="pill bad">ค้าง 2 วัน</span> ช้ากว่า 2 วันทำการขึ้นไป</p>
+    <p><span class="pill neutral">ตรวจไม่ได้</span> ดึงวันที่ของข้อมูลไม่สำเร็จ ไม่ได้แปลว่ากระดานเสีย กดเปิดกระดานดูได้เลย &nbsp;
+       <span class="pill neutral">ดูวันที่ในกระดาน</span> หน้านี้อ่านวันที่ของกระดานนั้นเองไม่ได้ ให้ดูในกระดาน</p>
+    <p><span class="pill local">เฉพาะเครื่องนี้</span> ไม่มีหน้าสาธารณะ เปิดได้เฉพาะคอมที่รันโปรแกรมอยู่</p>
+    <p>นับวันทำการแบบจันทร์-ศุกร์ (ยังไม่รู้วันหยุดตลาด) &middot; ตลาดสหรัฐนับว่า "ปิดแล้ว" หลัง 09:30 น. เวลาไทย (กระดานสร้างเสร็จราว 08:40 น.) &middot; ตลาดไทยนับว่า "ปิดแล้ว" หลัง 19:00 น. (กระดานสร้างเสร็จราว 18:30 น.)</p>
+  </div>
+</main>
+
+<footer>
+  <div class="wrap">สร้างอัตโนมัติจากข้อมูลราคาปิด &middot; ไม่ใช่คำแนะนำการลงทุน เป็นเพียงเครื่องมือช่วยดูว่ากลุ่มไหนน่าไปศึกษาต่อ</div>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var ICON_EXT = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h7v7M13 3 5 11"/></svg>';
+  var ICON_HOME = '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 7.5 8 2.5l6 5M3.5 6.5V13.5h9V6.5"/></svg>';
+  var EARN_URL = 'https://earnings-board.tik-reminder.workers.dev';
+  var VOL_URL = 'https://caketiknarak-hash.github.io/volume-board/';  // #SET / #US เลือกแท็บตอนเปิด
+  var META_TIMEOUT_MS = 8000;
+
+  // ---------------- ตัวช่วยวันที่ (เวลาไทย = UTC+7) ----------------
+  var MON = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'];
+  var DAY = 86400000, HOUR = 3600000;
+  var now = Date.now();
+  function ymdToMs(s) { var p = s.split('-'); return Date.UTC(+p[0], +p[1] - 1, +p[2]); }
+  function msToYmd(ms) { return new Date(ms).toISOString().slice(0, 10); }
+  function thDate(ymd) { var p = ymd.split('-'); return (+p[2]) + ' ' + MON[+p[1] - 1] + ' ' + (+p[0] + 543); }
+  function thStamp(ms) { // วันที่ + เวลาไทย
+    var d = new Date(ms + 7 * HOUR), p = function (n) { return (n < 10 ? '0' : '') + n; };
+    return d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + ' ' + (d.getUTCFullYear() + 543) + ' ' + p(d.getUTCHours()) + ':' + p(d.getUTCMinutes()) + ' น.';
+  }
+  function ago(ms) {
+    var m = Math.max(0, Math.round((now - ms) / 60000));
+    if (m < 60) return m + ' นาทีที่แล้ว';
+    var h = Math.round(m / 60);
+    if (h < 48) return h + ' ชม.ที่แล้ว';
+    return Math.round(h / 24) + ' วันที่แล้ว';
+  }
+  function isWeekday(ymd) { var w = new Date(ymdToMs(ymd)).getUTCDay(); return w >= 1 && w <= 5; }
+  function prevWeekday(ymd) { var d = ymdToMs(ymd); do { d -= DAY; } while (!isWeekday(msToYmd(d))); return msToYmd(d); }
+  function onOrPrevWeekday(ymd) { return isWeekday(ymd) ? ymd : prevWeekday(ymd); }
+  function weekdaysBetween(a, b) { // จำนวนวันทำการที่ a ตามหลัง b (a <= b)
+    var n = 0, d = ymdToMs(a), end = ymdToMs(b);
+    while (d < end) { d += DAY; if (isWeekday(msToYmd(d))) n++; }
+    return n;
+  }
+  // รอบตลาดล่าสุดที่ "ปิดแล้ว" (ประมาณ ไม่รู้วันหยุด) ; จุดตัดเลื่อนไปหลังเวลาที่กระดานสร้างเสร็จ จะได้ไม่ขึ้น "ค้าง" ทั้งที่รอบสร้างยังไม่ถึงเวลา
+  // ตลาดสหรัฐ : กระดานสร้างเสร็จราว 08:41 น. ไทย -> นับว่าปิดแล้วหลัง 09:30 น.
+  function expectedUS() { return prevWeekday(msToYmd(now + 7 * HOUR - 9.5 * HOUR)); }
+  // SET : กระดานสร้างเสร็จราว 18:30 น. -> นับว่าปิดแล้วหลัง 19:00 น.
+  function expectedSET() { return onOrPrevWeekday(msToYmd(now + 7 * HOUR - 19 * HOUR)); }
+  function status(through, expected) {
+    var gap = through >= expected ? 0 : weekdaysBetween(through, expected);
+    if (gap === 0) return { cls: 'ok', txt: 'สด' };
+    if (gap === 1) return { cls: 'warn', txt: 'ค้าง 1 วัน' };
+    return { cls: 'bad', txt: 'ค้าง ' + gap + ' วัน' };
+  }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function btn(href, text, primary, ext) {
+    return '<a class="btn' + (primary ? ' primary' : '') + '" href="' + esc(href) + '"' + (ext ? ' target="_blank" rel="noopener"' : '') + '>' + esc(text) + (ext ? ICON_EXT : '') + '</a>';
+  }
+  function chip(txt) { return '<span class="src">' + esc(txt) + '</span>'; }
+
+  // ---------------- การ์ดแต่ละใบ ----------------
+  // US/SET : phase = checking (รอ meta) -> ok (ได้ meta) | fail (ดึงไม่ได้) ; ไม่มีค่าเริ่มต้นเป็นข้อมูลจริง
+  var state = {
+    us:  { phase: 'checking' },
+    set: { phase: 'checking' }
+  };
+  var BOARDS = {
+    us:  { title: 'US Momentum', metaFile: 'meta.json', href: 'index.html', expected: expectedUS,
+           desc: 'เงินกำลังไหลเข้าหรือออกจากกลุ่มไหนในตลาดหุ้นสหรัฐ ดูทั้ง Sector และ Theme พร้อมโซน Leading / Improving / Weakening / Lagging' },
+    set: { title: 'SET Theme (หุ้นไทย)', metaFile: 'meta_set.json', href: 'set.html', expected: expectedSET,
+           desc: 'ธีมหรืออุตสาหกรรมไหนของหุ้นไทยกำลังแข็งแรงหรืออ่อนแรงเมื่อเทียบกับดัชนี SET พร้อมหุ้นสมาชิกของแต่ละธีม' }
+  };
+
+  function cardBoard(key, o) {
+    var s = state[key], pill, when;
+    if (s.phase === 'ok') {
+      var st = status(s.through, o.expected());
+      pill = '<span class="pill ' + st.cls + '">' + st.txt + '</span>';
+      when = '<b>ข้อมูลถึง ' + thDate(s.through) + '</b> · สร้างเมื่อ ' + thStamp(s.built) + ' (' + ago(s.built) + ')' + chip('อ่านจาก ' + o.metaFile);
+    } else if (s.phase === 'fail') {
+      pill = '<span class="pill neutral">ตรวจไม่ได้</span>';
+      when = 'ดึงข้อมูลไม่สำเร็จ — เปิดกระดานโดยตรง';
+    } else {
+      pill = '<span class="pill neutral checking">กำลังตรวจ…</span>';
+      when = 'กำลังตรวจ…';
+    }
+    return '<article class="card" id="card-' + key + '">' +
+      '<div class="c-head"><h3>' + o.title + '</h3>' + pill + '</div>' +
+      '<p class="c-desc">' + o.desc + '</p>' +
+      '<dl class="c-meta">' +
+        '<dt>อัปเดตล่าสุด</dt><dd>' + when + '</dd>' +
+        '<dt>โฮสต์</dt><dd>GitHub Pages (สาธารณะ)</dd>' +
+      '</dl>' +
+      '<div class="c-act">' + btn(o.href, 'เปิดกระดาน', true, false) + '</div></article>';
+  }
+
+  function cardEarn() {
+    return '<article class="card" id="card-earn">' +
+      '<div class="c-head"><h3>งบ Earnings (หุ้นสหรัฐ)</h3><span class="pill neutral">ดูวันที่ในกระดาน</span></div>' +
+      '<p class="c-desc">วันนี้มีบริษัทไหนประกาศงบ ผลงบชนะ/แพ้คาดแค่ไหน และราคา pre-market / after-hours ขยับเท่าไร</p>' +
+      '<dl class="c-meta">' +
+        '<dt>อัปเดตล่าสุด</dt><dd>ดูวันที่ในกระดาน ' + chip('หน้านี้อ่านวันที่ของกระดานนี้ไม่ได้') + '</dd>' +
+        '<dt>โฮสต์</dt><dd>Cloudflare Worker (สาธารณะ)</dd>' +
+      '</dl>' +
+      '<div class="c-act">' + btn(EARN_URL, 'เปิดกระดาน', true, true) + '</div></article>';
+  }
+
+  function cardVol() {
+    return '<article class="card" id="card-vol">' +
+      '<div class="c-head"><h3>กระดานป้ายวอลุ่ม</h3><span class="pill neutral">ดูวันที่ในกระดาน</span></div>' +
+      '<p class="c-desc">หุ้นตัวไหนมีวอลุ่มผิดปกติ (ป้าย HVQ / HVY / HVE) ทั้งตลาด SET และ US</p>' +
+      '<dl class="c-meta">' +
+        '<dt>อัปเดตล่าสุด</dt><dd>ดูวันที่ในกระดาน ' + chip('หน้านี้อ่านวันที่ของกระดานนี้ไม่ได้') + '</dd>' +
+        '<dt>โฮสต์</dt><dd>GitHub Pages (สาธารณะ) · อัปเดตจากคอมเครื่องนี้หลังตลาดปิด</dd>' +
+      '</dl>' +
+      '<div class="c-act">' +
+        btn(VOL_URL + '#SET', 'เปิด SET', true, true) +
+        btn(VOL_URL + '#US', 'เปิด US', false, true) +
+      '</div></article>';
+  }
+
+  function cardLocal(title, desc, href) {
+    return '<article class="card local">' +
+      '<div class="c-head"><h3>' + title + '</h3><span class="pill local">' + ICON_HOME + 'เฉพาะเครื่องนี้</span></div>' +
+      '<p class="c-desc">' + desc + '</p>' +
+      '<dl class="c-meta"><dt>โฮสต์</dt><dd>คอมเครื่องนี้ ' + chip(href.replace('http://', '')) + '</dd></dl>' +
+      '<p class="note">เปิดได้เฉพาะคอมเครื่องนี้ (ต้องรันโปรแกรมไว้ก่อน)</p>' +
+      '<div class="c-act">' + btn(href, 'เปิดในเครื่องนี้', false, true) + '</div></article>';
+  }
+  function cardOther() {
+    return '<article class="card local">' +
+      '<div class="c-head"><h3>สแกนแพทเทิร์นกราฟ</h3><span class="pill local">Telegram อย่างเดียว</span></div>' +
+      '<p class="c-desc">สแกนหาแพทเทิร์นกราฟในหุ้น US และหุ้นไทย แล้วส่งผลเข้า Telegram</p>' +
+      '<p class="note">ไม่มีหน้าเว็บ จึงไม่มีปุ่มเปิด</p></article>';
+  }
+
+  function render() {
+    document.getElementById('grid-online').innerHTML =
+      cardBoard('us', BOARDS.us) + cardBoard('set', BOARDS.set) + cardEarn() + cardVol();
+    document.getElementById('grid-local').innerHTML =
+      cardLocal('พอร์ต', 'ยอดถือและกำไรขาดทุน พร้อมราคาสด', 'http://localhost:8890') +
+      cardLocal('DR Converter', 'แปลงราคา DR กับหุ้นแม่ในต่างประเทศ ทั้งสองทาง', 'http://localhost:8899');
+    document.getElementById('grid-other').innerHTML = cardOther();
+    document.getElementById('nowline').textContent = 'ตรวจสถานะเมื่อ ' + thStamp(now) + ' (เวลาไทย)';
+  }
+  render();
+
+  // ---------------- ดึง meta จาก Pages (same-origin) ; ไม่สำเร็จ/ช้าเกิน 8 วินาที = "ตรวจไม่ได้" ----------------
+  function redraw(key) {
+    var el = document.getElementById('card-' + key);
+    if (el) el.outerHTML = cardBoard(key, BOARDS[key]);
+  }
+  function loadMeta(key) {
+    var file = BOARDS[key].metaFile, done = false;
+    var ctl = ('AbortController' in window) ? new AbortController() : null;
+    function fail() { if (done) return; done = true; clearTimeout(timer); state[key] = { phase: 'fail' }; redraw(key); }
+    var timer = setTimeout(function () { if (ctl) ctl.abort(); fail(); }, META_TIMEOUT_MS);
+    fetch(file + '?t=' + Math.floor(now / 600000), { cache: 'no-store', signal: ctl ? ctl.signal : undefined })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (m) {
+        var built = m && Date.parse(m.built_at_utc);
+        if (!m || !/^\d{4}-\d{2}-\d{2}$/.test(m.data_through || '') || isNaN(built)) throw new Error('shape');
+        if (done) return;
+        done = true; clearTimeout(timer);
+        state[key] = { phase: 'ok', through: m.data_through, built: built };
+        redraw(key);
+      })
+      .catch(fail);
+  }
+  loadMeta('us');
+  loadMeta('set');
+})();
+</script>
+</body>
+</html>
